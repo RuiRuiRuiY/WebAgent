@@ -9,12 +9,15 @@ import {
 } from "@assistant-ui/react-langgraph";
 
 import { createClient } from "@/lib/chatApi";
+import { LangGraphThreadListAdapter } from "@/lib/langgraph-thread-list-adapter";
 import { Thread } from "@/components/thread";
+import { ThreadList } from "@/components/thread-list";
 
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_LANGGRAPH_ASSISTANT_ID!;
 
 export function Assistant() {
   const client = useMemo(() => createClient(), []);
+  const adapter = useMemo(() => new LangGraphThreadListAdapter(client), [client]);
   const stream = useMemo(
     () =>
       unstable_createLangGraphStream({
@@ -25,16 +28,13 @@ export function Assistant() {
   );
 
   const runtime = useLangGraphRuntime({
-    unstable_allowCancellation: true,
     stream,
-    create: async () => {
-      const { thread_id } = await client.threads.create();
-      return { externalId: thread_id };
-    },
-    load: async (externalId) => {
+    unstable_allowCancellation: true,
+    unstable_threadListAdapter: adapter,
+    load: async (threadId) => {
       const state = await client.threads.getState<{
         messages: LangChainMessage[];
-      }>(externalId);
+      }>(threadId);
       return {
         messages: state.values.messages,
         interrupts: state.tasks[0]?.interrupts,
@@ -44,7 +44,14 @@ export function Assistant() {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <Thread />
+      <div className="flex h-full">
+        <div className="w-60 shrink-0 border-r">
+          <ThreadList />
+        </div>
+        <div className="flex min-w-0 flex-1">
+          <Thread />
+        </div>
+      </div>
     </AssistantRuntimeProvider>
   );
 }
