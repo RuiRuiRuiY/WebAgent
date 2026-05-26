@@ -1,3 +1,25 @@
+# Thread List Rename Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add inline rename functionality to ThreadList's "More" dropdown menu.
+
+**Architecture:** Single-file change to `frontend/components/thread-list.tsx`. The `ThreadListPrimitive.Items` render function receives `threadListItem: ThreadListItemState` for title display; rename is performed via `useAuiState((s) => s.threadListItem).rename(newTitle)`. No backend or adapter changes needed.
+
+**Tech Stack:** Next.js 16, React 19, @assistant-ui/react ^0.14.8, lucide-react
+
+---
+
+### Task 1: Add rename UI to thread-list.tsx
+
+**Files:**
+- Modify: `frontend/components/thread-list.tsx`
+
+- [ ] **Step 1: Update imports**
+
+Add `PencilIcon` to lucide-react imports, add `useAuiState` from `@assistant-ui/store`, add `useState` and `useRef` from React:
+
+```tsx
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -6,7 +28,7 @@ import {
   ThreadListItemPrimitive,
   ThreadListPrimitive,
 } from "@assistant-ui/react";
-import { useAui } from "@assistant-ui/store";
+import { useAuiState } from "@assistant-ui/store";
 import {
   ArchiveIcon,
   MoreHorizontalIcon,
@@ -15,67 +37,48 @@ import {
   TrashIcon,
 } from "lucide-react";
 import { type FC, useRef, useState } from "react";
+```
 
-export const ThreadList: FC = () => {
-  return (
-    <ThreadListPrimitive.Root className="flex flex-col gap-1 p-2">
-      <ThreadListNew />
-      <AuiIf condition={(s) => s.threads.isLoading}>
-        <ThreadListSkeleton />
-      </AuiIf>
-      <AuiIf condition={(s) => !s.threads.isLoading}>
-        <ThreadListPrimitive.Items>
-          {({ threadListItem }) => <ThreadListItem state={threadListItem} />}
-        </ThreadListPrimitive.Items>
-      </AuiIf>
-    </ThreadListPrimitive.Root>
-  );
-};
+- [ ] **Step 2: Update `ThreadListPrimitive.Items` render function**
 
-const ThreadListNew: FC = () => {
-  return (
-    <ThreadListPrimitive.New asChild>
-      <Button
-        variant="outline"
-        className="h-9 justify-start gap-2 rounded-lg px-3 text-sm hover:bg-muted data-active:bg-muted"
-      >
-        <PlusIcon className="size-4" />
-        New Thread
-      </Button>
-    </ThreadListPrimitive.New>
-  );
-};
+Change from no-argument render function to one that receives `threadListItem` state:
 
-const ThreadListSkeleton: FC = () => {
-  return (
-    <div className="flex flex-col gap-1" role="status" aria-label="Loading threads">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div
-          key={i}
-          className="flex h-9 items-center px-3"
-        >
-          <Skeleton className="h-4 w-full" />
-        </div>
-      ))}
-    </div>
-  );
-};
+```tsx
+<AuiIf condition={(s) => !s.threads.isLoading}>
+  <ThreadListPrimitive.Items>
+    {({ threadListItem }) => <ThreadListItem state={threadListItem} />}
+  </ThreadListPrimitive.Items>
+</AuiIf>
+```
 
-const ThreadListItem: FC<{ state: { title?: string } }> = ({ state }) => {
+- [ ] **Step 3: Update `ThreadListItem` component**
+
+Accept `state` prop, manage `isEditing` state, render input in edit mode:
+
+```tsx
+const ThreadListItem: FC<{ state: ThreadListItemState }> = ({ state }) => {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const aui = useAui();
+
+  const handleStartRename = () => {
+    setIsEditing(true);
+  };
 
   const handleSave = () => {
     const newTitle = inputRef.current?.value.trim();
     if (newTitle && newTitle !== state.title) {
-      aui.threadListItem().rename(newTitle);
+      useAuiState((s) => s.threadListItem).rename(newTitle);
     }
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") handleCancel();
   };
 
   if (isEditing) {
@@ -86,10 +89,7 @@ const ThreadListItem: FC<{ state: { title?: string } }> = ({ state }) => {
           defaultValue={state.title}
           autoFocus
           onBlur={handleSave}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave();
-            if (e.key === "Escape") handleCancel();
-          }}
+          onKeyDown={handleKeyDown}
           className="h-7 w-full rounded border bg-background px-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
       </div>
@@ -103,11 +103,17 @@ const ThreadListItem: FC<{ state: { title?: string } }> = ({ state }) => {
           {state.title || "New Chat"}
         </span>
       </ThreadListItemPrimitive.Trigger>
-      <ThreadListItemMore onRename={() => setIsEditing(true)} />
+      <ThreadListItemMore onRename={handleStartRename} />
     </ThreadListItemPrimitive.Root>
   );
 };
+```
 
+- [ ] **Step 4: Update `ThreadListItemMore` component**
+
+Add `onRename` prop and Rename menu item between Archive and Delete:
+
+```tsx
 const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
   return (
     <ThreadListItemMorePrimitive.Root>
@@ -149,3 +155,19 @@ const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
     </ThreadListItemMorePrimitive.Root>
   );
 };
+```
+
+- [ ] **Step 5: Verify build**
+
+```bash
+cd frontend && npm run build
+```
+
+Expected: Build succeeds with no errors.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add frontend/components/thread-list.tsx
+git commit -m "feat: add inline rename to thread list"
+```
