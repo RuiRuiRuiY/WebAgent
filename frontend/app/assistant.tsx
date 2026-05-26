@@ -33,24 +33,24 @@ export function Assistant() {
     unstable_threadListAdapter: adapter,
     load: async (threadId) => {
       const state = await client.threads.getState<{
-        messages: LangChainMessage[];
+        messages?: LangChainMessage[];
       }>(threadId);
       return {
-        messages: state.values.messages,
-        interrupts: state.tasks[0]?.interrupts,
+        messages: state.values?.messages ?? [],
+        interrupts: state.tasks?.[0]?.interrupts,
       };
     },
   });
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="flex h-full">
-        <div className="w-60 shrink-0 border-r">
+      <div className="flex h-dvh w-full">
+        <aside className="w-60 shrink-0 border-r">
           <ThreadList />
-        </div>
-        <div className="flex min-w-0 flex-1">
+        </aside>
+        <main className="min-w-0 flex-1">
           <Thread />
-        </div>
+        </main>
       </div>
     </AssistantRuntimeProvider>
   );

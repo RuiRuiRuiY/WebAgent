@@ -23,6 +23,7 @@ export class LangGraphThreadListAdapter implements RemoteThreadListAdapter {
     return {
       threads: result.map((t) => ({
         remoteId: t.thread_id,
+        externalId: t.thread_id,
         status: normalizeStatus(t.metadata?.status),
         title: t.metadata?.title as string | undefined,
       })),
